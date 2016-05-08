@@ -7,6 +7,10 @@ import pytest
 from noiseprotocol.crypto.aead import AESGCM
 
 
+def test_AESGCM_name():
+    assert AESGCM('\x00'*32).name == 'AESGCM'
+
+
 @pytest.mark.parametrize('invalid_length', range(32) + [33])
 def test_AESGCM_invalid_key_length(invalid_length):
     with pytest.raises(ValueError):
@@ -36,6 +40,8 @@ def test_AESGCM_nonce(in_nonce, expected):
     assert AESGCM.nonce(in_nonce) == expected
 
 
+# KATs (or known answer test/test vectors) have been taken from:
+# http://csrc.nist.gov/groups/STM/cavp/
 @pytest.mark.parametrize(
     'in_key,in_nonce,in_plaintext,in_ad,expected_ciphertext',
     [
@@ -62,10 +68,12 @@ def test_AESGCM_nonce(in_nonce, expected):
         ),
     ]
 )
-def test_AESGCM_encrypt_kat(in_key, in_nonce, in_plaintext, in_ad, expected_ciphertext):
+def test_AESGCM_encrypt_KAT(in_key, in_nonce, in_plaintext, in_ad, expected_ciphertext):
     assert AESGCM(in_key).encrypt(in_nonce, in_ad, in_plaintext) == expected_ciphertext
 
 
+# KATs (or known answer test/test vectors) have been taken from:
+# http://csrc.nist.gov/groups/STM/cavp/
 @pytest.mark.parametrize(
     'in_key,in_nonce,in_ciphertext,in_ad,expected_plaintext',
     [
@@ -92,5 +100,5 @@ def test_AESGCM_encrypt_kat(in_key, in_nonce, in_plaintext, in_ad, expected_ciph
         ),
     ]
 )
-def test_AESGCM_decrypt_kat(in_key, in_nonce, in_ciphertext, in_ad, expected_plaintext):
+def test_AESGCM_decrypt_KAT(in_key, in_nonce, in_ciphertext, in_ad, expected_plaintext):
     assert AESGCM(in_key).decrypt(in_nonce, in_ad, in_ciphertext) == expected_plaintext
