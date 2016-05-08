@@ -23,7 +23,7 @@ def aes_gcm_encrypt(k, n, ad, plaintext):
     encryptor.authenticate_additional_data(ad)
     ciphertext = encryptor.update(plaintext) + encryptor.finalize()
 
-    return encryptor.tag + ciphertext
+    return ciphertext + encryptor.tag
 
 def aes_gcm_decrypt(k, n, ad, ciphertext):
     '''
@@ -41,11 +41,11 @@ def aes_gcm_decrypt(k, n, ad, ciphertext):
 
     decryptor = Cipher(
         algorithms.AES(k),
-        modes.GCM(n, ciphertext[:16]),
+        modes.GCM(n, ciphertext[-16:]),
         backend=default_backend()
     ).decryptor()
 
     decryptor.authenticate_additional_data(ad)
-    plaintext = decryptor.update(ciphertext[16:]) + decryptor.finalize()
+    plaintext = decryptor.update(ciphertext[:-16]) + decryptor.finalize()
 
     return plaintext
