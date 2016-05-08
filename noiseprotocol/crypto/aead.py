@@ -25,8 +25,8 @@ class AESGCM(AEADCipher):
        32 bits of zeros followed by big-endian encoding of n.
     '''
 
-    @classmethod
-    def nonce(cls, n):
+    @staticmethod
+    def nonce(n):
         '''
            Construct a 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
            value n encoded as a big-endian value.
