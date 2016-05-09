@@ -109,6 +109,15 @@ def test_AESGCM_decrypt_invalid_tag():
         AESGCM('\x00'*32).decrypt('\x00'*12, '', '\x00'*16)
 
 
+def test_AESGCM_decrypt_invalid_nonce():
+    with pytest.raises(ValueError):
+        AESGCM('\x00'*32).decrypt('', '', '\x00'*16)
+
+def test_AESGCM_encrypt_invalid_nonce():
+    with pytest.raises(ValueError):
+        AESGCM('\x00'*32).encrypt('', '', '\x00'*16)
+
+
 def test_ChaChaPoly_name():
     assert ChaChaPoly('\x00'*32).name == 'ChaChaPoly'
 
@@ -223,3 +232,12 @@ def test_ChaChaPoly_decrypt_KAT(in_key, in_nonce, in_ciphertext, in_ad, expected
 def test_ChaChaPoly_decrypt_invalid_tag():
     with pytest.raises(InvalidTag):
         ChaChaPoly('\x00'*32).decrypt('\x00'*12, '', '\x00'*16)
+
+
+def test_ChaChaPoly_decrypt_invalid_nonce():
+    with pytest.raises(ValueError):
+        ChaChaPoly('\x00'*32).decrypt('', '', '\x00'*16)
+
+def test_ChaChaPoly_encrypt_invalid_nonce():
+    with pytest.raises(ValueError):
+        ChaChaPoly('\x00'*32).encrypt('', '', '\x00'*16)
