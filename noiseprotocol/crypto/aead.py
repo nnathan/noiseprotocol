@@ -114,18 +114,17 @@ class ChaChaPoly(AEADCipher):
         return '\x00\x00\x00\x00' + pack('<Q', n)
 
     @staticmethod
-    def poly1305_key_gen(key, nonce):
-        """Generate the key for the Poly1305 authenticator"""
-        poly = ChaCha(key, nonce)
-        return poly.encrypt(bytearray(32))
-
-    @staticmethod
-    def pad16(data):
+    def _pad16(data):
         """Return padding for the Associated Authenticated Data"""
         if len(data) % 16 == 0:
             return bytearray(0)
         else:
             return bytearray(16 - (len(data) % 16))
+
+    def _poly1305_gen_key(self, nonce):
+        """Generate the key for the Poly1305 authenticator"""
+        poly = _ChaCha(self.key, nonce)
+        return poly.encrypt(bytearray(32))
 
     def encrypt(self, n, ad, plaintext):
         '''
@@ -135,17 +134,17 @@ class ChaChaPoly(AEADCipher):
         if len(n) != 12:
             raise ValueError("Nonce must be 96 bit large")
 
-        otk = self.poly1305_key_gen(self.key, nonce)
+        otk = self._poly1305_gen_key(n)
 
-        ciphertext = ChaCha(self.key, nonce, counter=1).encrypt(plaintext)
+        ciphertext = _ChaCha(self.key, n, counter=1).encrypt(bytearray(plaintext))
 
-        mac_data = ad + self.pad16(ad)
-        mac_data += ciphertext + self.pad16(ciphertext)
+        mac_data = ad + self._pad16(ad)
+        mac_data += ciphertext + self._pad16(ciphertext)
         mac_data += pack('<Q', len(ad))
         mac_data += pack('<Q', len(ciphertext))
-        tag = Poly1305(otk).create_tag(mac_data)
+        tag = _Poly1305(otk).create_tag(mac_data)
 
-        return ciphertext + tag
+        return str(ciphertext + tag)
 
     def decrypt(self, n, ad, ciphertext):
         '''
@@ -163,21 +162,21 @@ class ChaChaPoly(AEADCipher):
         expected_tag = ciphertext[-16:]
         ciphertext = ciphertext[:-16]
 
-        otk = self.poly1305_key_gen(self.key, nonce)
+        otk = self._poly1305_gen_key(n)
 
-        mac_data = data + self.pad16(data)
-        mac_data += ciphertext + self.pad16(ciphertext)
-        mac_data += pack('<Q', len(data))
+        mac_data = ad + self._pad16(ad)
+        mac_data += ciphertext + self._pad16(ciphertext)
+        mac_data += pack('<Q', len(ad))
         mac_data += pack('<Q', len(ciphertext))
-        tag = Poly1305(otk).create_tag(mac_data)
+        tag = _Poly1305(otk).create_tag(mac_data)
 
         if tag != expected_tag:
             raise InvalidTag
 
-        return ChaCha(self.key, nonce, counter=1).decrypt(ciphertext)
+        return str(_ChaCha(self.key, n, counter=1).decrypt(ciphertext))
 
 
-class ChaCha(object):
+class _ChaCha(object):
 
     """Pure python implementation of ChaCha cipher"""
 
@@ -259,10 +258,10 @@ class ChaCha(object):
     @staticmethod
     def chacha_block(key, counter, nonce, rounds):
         """Generate a state of a single block"""
-        state = ChaCha.constants + key + [counter] + nonce
+        state = _ChaCha.constants + key + [counter] + nonce
 
         working_state = state[:]
-        dbl_round = ChaCha.double_round
+        dbl_round = _ChaCha.double_round
         for _ in range(0, rounds // 2):
             dbl_round(working_state)
 
@@ -294,19 +293,21 @@ class ChaCha(object):
         self.rounds = rounds
 
         # convert bytearray key and nonce to little endian 32 bit unsigned ints
-        self.key = ChaCha._bytearray_to_words(key)
-        self.nonce = ChaCha._bytearray_to_words(nonce)
+        self.key = _ChaCha._bytearray_to_words(key)
+        self.nonce = _ChaCha._bytearray_to_words(nonce)
 
     def encrypt(self, plaintext):
         """Encrypt the data"""
+
         encrypted_message = bytearray()
         for i, block in enumerate(plaintext[i:i+64] for i
                                   in range(0, len(plaintext), 64)):
-            key_stream = ChaCha.chacha_block(self.key,
+            print (i, block, type(block), len(block))
+            key_stream = _ChaCha.chacha_block(self.key,
                                              self.counter + i,
                                              self.nonce,
                                              self.rounds)
-            key_stream = ChaCha.word_to_bytearray(key_stream)
+            key_stream = _ChaCha.word_to_bytearray(key_stream)
             encrypted_message += bytearray(x ^ y for x, y
                                            in izip(key_stream, block))
 
@@ -317,7 +318,7 @@ class ChaCha(object):
         return self.encrypt(ciphertext)
 
 
-class Poly1305(object):
+class _Poly1305(object):
     """Implementation of Poly1305 authenticator for RFC 7539"""
 
     P = 0x3fffffffffffffffffffffffffffffffb  # 2^130-5
