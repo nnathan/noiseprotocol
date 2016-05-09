@@ -159,8 +159,8 @@ class ChaChaPoly(AEADCipher):
                 'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
             )
 
-        expected_tag = ciphertext[-16:]
-        ciphertext = ciphertext[:-16]
+        expected_tag = bytearray(ciphertext[-16:])
+        ciphertext = bytearray(ciphertext[:-16])
 
         otk = self._poly1305_gen_key(n)
 
@@ -302,7 +302,6 @@ class _ChaCha(object):
         encrypted_message = bytearray()
         for i, block in enumerate(plaintext[i:i+64] for i
                                   in range(0, len(plaintext), 64)):
-            print (i, block, type(block), len(block))
             key_stream = _ChaCha.chacha_block(self.key,
                                              self.counter + i,
                                              self.nonce,
