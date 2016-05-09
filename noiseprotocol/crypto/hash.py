@@ -2,6 +2,8 @@
 
 from hashlib import sha256, sha512
 
+from pyblake2 import blake2s, blake2b
+
 
 class HashFunction(object):
 
@@ -20,3 +22,15 @@ class SHA512(HashFunction):
 
     def hash(self, data):
         return sha512(data).digest()
+
+
+class BLAKE2b(HashFunction):
+
+    def hash(self, data):
+        return blake2b(data).digest()
+
+
+class BLAKE2s(HashFunction):
+
+    def hash(self, data):
+        return blake2s(data).digest()
