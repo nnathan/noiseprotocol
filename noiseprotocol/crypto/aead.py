@@ -8,11 +8,7 @@ from __future__ import division
 
 from struct import pack, unpack
 
-try:
-    # in Python 3 the native zip returns iterator
-    from itertools import izip
-except ImportError:
-    izip = zip
+from itertools import izip
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
