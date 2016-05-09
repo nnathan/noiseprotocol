@@ -4,7 +4,7 @@ from binascii import unhexlify
 
 import pytest
 
-from noiseprotocol.crypto.aead import AESGCM
+from noiseprotocol.crypto.aead import AESGCM, ChaChaPoly
 
 
 def test_AESGCM_name():
@@ -102,3 +102,36 @@ def test_AESGCM_encrypt_KAT(in_key, in_nonce, in_plaintext, in_ad, expected_ciph
 )
 def test_AESGCM_decrypt_KAT(in_key, in_nonce, in_ciphertext, in_ad, expected_plaintext):
     assert AESGCM(in_key).decrypt(in_nonce, in_ad, in_ciphertext) == expected_plaintext
+
+
+def test_ChaChaPoly_name():
+    assert ChaChaPoly('\x00'*32).name == 'ChaChaPoly'
+
+
+@pytest.mark.parametrize('invalid_length', range(32) + [33])
+def test_ChaChaPoly_invalid_key_length(invalid_length):
+    with pytest.raises(ValueError):
+        ChaChaPoly('\x00' * invalid_length)
+
+
+def test_ChaChaPoly_valid_key_length():
+    ChaChaPoly('\x00'*32)
+
+
+@pytest.mark.parametrize('invalid_length', range(16))
+def test_ChaChaPoly_decrypt_invalid_ciphertext_length(invalid_length):
+    with pytest.raises(ValueError):
+        ChaChaPoly('\x00' * 32).decrypt('\x00'*12, '0', 'x'*invalid_length)
+
+
+@pytest.mark.parametrize(
+    'in_nonce,expected',
+    [
+        (0, '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'),
+        (1, '\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00'),
+        (2**32 - 1, '\x00\x00\x00\x00\xff\xff\xff\xff\x00\x00\x00\x00'),
+        (2**64 - 1, '\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff'),
+    ]
+)
+def test_ChaChaPoly_nonce(in_nonce, expected):
+    assert ChaChaPoly.nonce(in_nonce) == expected

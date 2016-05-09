@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-# ChaCha and Poly1305 code
-#
-# Copyright (c) 2015, Hubert Kario
+# ChaCha and Poly1305 code courtesy and Copyright (c) 2015 Hubert Kario
 #
 # See the LICENSE file for legal information regarding use of this file.
 
@@ -53,6 +51,10 @@ class AESGCM(AEADCipher):
         '''
            Encrypts and returns concatenation of authentication tag and ciphertext.
         '''
+
+        if len(n) != 12:
+            raise ValueError("Nonce must be 96 bit large")
+
         encryptor = Cipher(
             algorithms.AES(self.key),
             modes.GCM(n, min_tag_length=16),
@@ -69,6 +71,9 @@ class AESGCM(AEADCipher):
            Returns plaintext or raises InvalidTag exception if fail to authenticate.
         '''
 
+        if len(n) != 12:
+            raise ValueError("Nonce must be 96 bit large")
+
         if len(ciphertext) < 16:
             raise ValueError(
                 'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
@@ -84,7 +89,7 @@ class AESGCM(AEADCipher):
         try:
             plaintext = decryptor.update(ciphertext[:-16]) + decryptor.finalize()
         except InvalidTag:
-            raise
+            raise InvalidTag
         except:
             raise
 
@@ -100,9 +105,9 @@ class ChaChaPoly(AEADCipher):
     '''
 
     @staticmethod
-    def nonce(cls, n):
+    def nonce(n):
         '''
-           Cona 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
+           Construct a 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
            value n encoded as a little-endian value.
         '''
 
@@ -122,37 +127,38 @@ class ChaChaPoly(AEADCipher):
         else:
             return bytearray(16 - (len(data) % 16))
 
-    def seal(self, nonce, plaintext, data):
-        """
-        Encrypts and authenticates plaintext using nonce and data. Returns the
-        ciphertext, consisting of the encrypted plaintext and tag concatenated.
-        """
-        if len(nonce) != 12:
+    def encrypt(self, n, ad, plaintext):
+        '''
+           Encrypts and returns concatenation of authentication tag and ciphertext.
+        '''
+
+        if len(n) != 12:
             raise ValueError("Nonce must be 96 bit large")
 
         otk = self.poly1305_key_gen(self.key, nonce)
 
         ciphertext = ChaCha(self.key, nonce, counter=1).encrypt(plaintext)
 
-        mac_data = data + self.pad16(data)
+        mac_data = ad + self.pad16(ad)
         mac_data += ciphertext + self.pad16(ciphertext)
-        mac_data += pack('<Q', len(data))
+        mac_data += pack('<Q', len(ad))
         mac_data += pack('<Q', len(ciphertext))
         tag = Poly1305(otk).create_tag(mac_data)
 
         return ciphertext + tag
 
-    def open(self, nonce, ciphertext, data):
-        """
-        Decrypts and authenticates ciphertext using nonce and data. If the
-        tag is valid, the plaintext is returned. If the tag is invalid,
-        returns None.
-        """
-        if len(nonce) != 12:
+    def decrypt(self, n, ad, ciphertext):
+        '''
+           Returns plaintext or raises InvalidTag exception if fail to authenticate.
+        '''
+
+        if len(n) != 12:
             raise ValueError("Nonce must be 96 bit long")
 
         if len(ciphertext) < 16:
-            return None
+            raise ValueError(
+                'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
+            )
 
         expected_tag = ciphertext[-16:]
         ciphertext = ciphertext[:-16]
@@ -166,7 +172,7 @@ class ChaChaPoly(AEADCipher):
         tag = Poly1305(otk).create_tag(mac_data)
 
         if tag != expected_tag:
-            return None
+            raise InvalidTag
 
         return ChaCha(self.key, nonce, counter=1).decrypt(ciphertext)
 
