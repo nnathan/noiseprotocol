@@ -4,7 +4,7 @@ from binascii import unhexlify
 
 import pytest
 
-from noiseprotocol.crypto.aead import AESGCM, ChaChaPoly
+from noiseprotocol.crypto.aead import AESGCM, ChaChaPoly, InvalidTag
 
 
 def test_AESGCM_name():
@@ -102,6 +102,11 @@ def test_AESGCM_encrypt_KAT(in_key, in_nonce, in_plaintext, in_ad, expected_ciph
 )
 def test_AESGCM_decrypt_KAT(in_key, in_nonce, in_ciphertext, in_ad, expected_plaintext):
     assert AESGCM(in_key).decrypt(in_nonce, in_ad, in_ciphertext) == expected_plaintext
+
+
+def test_AESGCM_decrypt_invalid_tag():
+    with pytest.raises(InvalidTag):
+        AESGCM('\x00'*32).decrypt('\x00'*12, '', '\x00'*16)
 
 
 def test_ChaChaPoly_name():
@@ -211,5 +216,10 @@ def test_ChaChaPoly_encrypt_KAT(in_key, in_nonce, in_plaintext, in_ad, expected_
         ),
     ]
 )
-def test_ChaChaPoly_encrypt_KAT(in_key, in_nonce, in_ciphertext, in_ad, expected_plaintext):
+def test_ChaChaPoly_decrypt_KAT(in_key, in_nonce, in_ciphertext, in_ad, expected_plaintext):
     assert ChaChaPoly(in_key).decrypt(in_nonce, in_ad, in_ciphertext) == expected_plaintext
+
+
+def test_ChaChaPoly_decrypt_invalid_tag():
+    with pytest.raises(InvalidTag):
+        ChaChaPoly('\x00'*32).decrypt('\x00'*12, '', '\x00'*16)

@@ -16,8 +16,10 @@ except ImportError:
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
-from cryptography.exceptions import InvalidTag
+from cryptography.exceptions import InvalidTag as _InvalidTag
 
+class InvalidTag(Exception):
+    pass
 
 class AEADCipher(object):
 
@@ -88,7 +90,7 @@ class AESGCM(AEADCipher):
         decryptor.authenticate_additional_data(ad)
         try:
             plaintext = decryptor.update(ciphertext[:-16]) + decryptor.finalize()
-        except InvalidTag:
+        except _InvalidTag:
             raise InvalidTag
         except:
             raise
