@@ -98,3 +98,16 @@ class Curve25519(DH):
 
     def dh(self, keypair, public_key):
         return self._smult_curve25519(keypair.private, public_key)
+
+
+class Curve448(DH):
+
+    _P = 2 ** 448 - 2 ** 224 - 1
+    _A = 156326
+
+    def __init__(self):
+        raise RuntimeError('Not Implemented Yet')
+
+    @property
+    def name(self):
+        return '448'
