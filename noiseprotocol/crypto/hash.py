@@ -30,18 +30,28 @@ class SHA256(HashFunction):
     def __init__(self):
         self._backend = sha256
 
+    digest_size = 32
+
 
 class SHA512(HashFunction):
 
     def __init__(self):
         self._backend = sha512
 
+    digest_size = 64
+
+
 class BLAKE2b(HashFunction):
 
     def __init__(self):
         self._backend = blake2b
 
+    digest_size = 64
+
+
 class BLAKE2s(HashFunction):
 
     def __init__(self):
         self._backend = blake2s
+
+    digest_size = 32
