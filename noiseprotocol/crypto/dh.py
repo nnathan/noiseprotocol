@@ -17,6 +17,8 @@ class Curve25519(object):
     name = '25519'
     dhlen = 32
 
+    dhlen = 32
+
     def __init__(self):
         pass
 
@@ -32,6 +34,8 @@ class Curve25519(object):
 class Curve448(object):
 
     name = '448'
+    dhlen = 56
+
     dhlen = 56
 
     def __init__(self):
