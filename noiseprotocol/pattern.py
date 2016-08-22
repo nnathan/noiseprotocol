@@ -44,7 +44,10 @@ Noise_NN = HandshakePattern(
     "NN",
     (),
     (),
-    (Token.E, Token.DHES, Token.S, Token.DHSS),
+    (
+        Token.E, Token.SWAP,
+        Token.E, Token.DHEE,
+    )
 )
 
 Noise_NK = HandshakePattern(
