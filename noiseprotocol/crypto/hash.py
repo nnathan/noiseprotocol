@@ -9,10 +9,6 @@ from pyblake2 import blake2s, blake2b
 
 class HashFunction(object):
 
-    @property
-    def name(self):
-        return self.__class__.__name__
-
     def hash(self, data):
         return self._backend(data).digest()
 
@@ -27,6 +23,8 @@ class HashFunction(object):
 
 class SHA256(HashFunction):
 
+    name = 'SHA256'
+
     def __init__(self):
         self._backend = sha256
 
@@ -34,6 +32,8 @@ class SHA256(HashFunction):
 
 
 class SHA512(HashFunction):
+
+    name = 'SHA512'
 
     def __init__(self):
         self._backend = sha512
@@ -43,6 +43,8 @@ class SHA512(HashFunction):
 
 class BLAKE2b(HashFunction):
 
+    name = 'BLAKE2b'
+
     def __init__(self):
         self._backend = blake2b
 
@@ -50,6 +52,8 @@ class BLAKE2b(HashFunction):
 
 
 class BLAKE2s(HashFunction):
+
+    name = 'BLAKE2s'
 
     def __init__(self):
         self._backend = blake2s

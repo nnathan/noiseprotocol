@@ -25,16 +25,14 @@ class AEADCipher(object):
 
         self.key = key
 
-    @property
-    def name(self):
-        return self.__class__.__name__
-
 
 class AESGCM(AEADCipher):
     '''
        AES256-GCM from NIST SP 800-38D with 128-bit tags. The 96-bit nonce is formed by encoding
        32 bits of zeros followed by big-endian encoding of n.
     '''
+
+    name = 'AESGCM'
 
     @staticmethod
     def nonce(n):
@@ -101,6 +99,8 @@ class ChaChaPoly(AEADCipher):
        a 64-bit nonce, in which case it's compatible to encode n directly into the ChaCha20 nonce
        without the 32-bit zero prefix).
     '''
+
+    name = 'ChaChaPoly'
 
     @staticmethod
     def nonce(n):
