@@ -52,6 +52,10 @@ class SymmetricState(object):
         else:
             self.h = self.hash.hash(protocol_name)
 
+        self.ck = self.h
+        self.cs.initialize('\x00'*32)
+
+
     def mix_key(self, input_key_material):
         self.ck, temp = self.hash.hkdf(self.ck, input_key_material)
         if len(temp) > 32:
@@ -101,6 +105,7 @@ class HandshakeState(object):
 
         cipher_name = self.ss.cs.cipher.name
         hash_name = self.ss.hash.name
+        dh_name = self.dh.name
 
         protocol_name = '_'.join([prefix, handshake_pattern.name, dh_name, cipher_name, hash_name])
         self.ss.initialize(protocol_name)
@@ -111,8 +116,9 @@ class HandshakeState(object):
         self.rs = rs
         self.re = re
         self.psk = psk
+        self.initiator = initiator
 
-        for t in initiator_premessages:
+        for t in handshake_pattern.initiator_premessages:
             if initiator and t == Token.S:
                 self.ss.mix_hash(s.public)
             elif initiator and t == Token.E:
@@ -122,7 +128,7 @@ class HandshakeState(object):
             elif not initiator and t == Token.E:
                 self.ss.mix_hash(re)
 
-        for t in responder_premessages:
+        for t in handshake_pattern.responder_premessages:
             if not initiator and t == Token.S:
                 self.ss.mix_hash(s.public)
             elif not initiator and t == Token.E:
@@ -132,10 +138,10 @@ class HandshakeState(object):
             elif initiator and t == Token.E:
                 self.ss.mix_hash(re)
 
-        self.patterns = handshake_pattern.messages[:]
+        self.patterns = list(handshake_pattern.messages)
 
     def write_message(self, payload):
-        if not initiator:
+        if not self.initiator:
             raise InvalidState("write_message called when not initiator")
 
         if len(self.patterns) == 0:
@@ -145,6 +151,7 @@ class HandshakeState(object):
 
         while len(self.patterns) > 0:
             p = self.patterns.pop(0)
+            print "token: {0}".format(p)
 
 
             if p == Token.E:
@@ -154,13 +161,13 @@ class HandshakeState(object):
             elif p == Token.S:
                 message_buffer += self.ss.encrypt_and_hash(self.s.public_key)
             elif p == Token.DHEE:
-                self.ss.mix_key(self.dh.dh(self.e.private, self.re))
+                self.ss.mix_key(self.dh.dh(self.e, self.re))
             elif p == Token.DHES:
-                self.ss.mix_key(self.dh.dh(self.e.private, self.rs))
+                self.ss.mix_key(self.dh.dh(self.e, self.rs))
             elif p == Token.DHSE:
-                self.ss.mix_key(self.dh.dh(self.s.private, self.re))
+                self.ss.mix_key(self.dh.dh(self.s, self.re))
             elif p == Token.DHSS:
-                self.ss.mix_key(self.dh.dh(self.s.private, self.rs))
+                self.ss.mix_key(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
                 # we're done
                 self.initiator = False
@@ -198,13 +205,13 @@ class HandshakeState(object):
                     buf = buf[self.dh.dhlen:]
                 self.rs = self.ss.decrypt_and_hash(temp)
             elif p == Token.DHEE:
-                self.ss.mix_key(self.dh.dh(self.e.private, self.re))
+                self.ss.mix_key(self.dh.dh(self.e, self.re))
             elif p == Token.DHES:
-                self.ss.mix_key(self.dh.dh(self.e.private, self.rs))
+                self.ss.mix_key(self.dh.dh(self.e, self.rs))
             elif p == Token.DHSE:
-                self.ss.mix_key(self.dh.dh(self.s.private, self.re))
+                self.ss.mix_key(self.dh.dh(self.s, self.re))
             elif p == Token.DHSS:
-                self.ss.mix_key(self.dh.dh(self.s.private, self.rs))
+                self.ss.mix_key(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
                 # we're done
                 self.initiator = True

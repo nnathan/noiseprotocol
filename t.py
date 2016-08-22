@@ -35,8 +35,8 @@ def doit(v):
     pattern = globals()['Noise_'+v['pattern']]
     prefix = 'Noise'
     assert name == '_'.join([prefix, pattern.name, init_dh.name, aead.name, hash.name])
-    init_prologue = v.get('init_prologue')
-    resp_prologue = v.get('resp_prologue')
+    init_prologue = unhex(v.get('init_prologue'))
+    resp_prologue = unhex(v.get('resp_prologue'))
     # sanity check
     assert init_prologue == resp_prologue
 
@@ -44,15 +44,14 @@ def doit(v):
     init_dh.priv = init_ephemeral
     resp_ephemeral = unhex(v.get('resp_ephemeral'))
     resp_dh.priv = init_ephemeral
-    print "init_dh.priv: {0}".format(hex(init_dh.priv))
-    kp = init_dh().generate_keypair()
-    print "init_dh.genkey.private: {0}".format(hex(kp.private))
-    print "init_dh.genkey.public: {0}".format(hex(kp.public))
 
-    e = unhex(v.get('init_ephemeral'))
-    re = unhex(v.get('resp_ephemeral'))
     alice = NoiseHandshake(aead, hash, init_dh)
     bob = NoiseHandshake(aead, hash, resp_dh)
+    p = unhex(v['messages'][0]['payload'])
+    alice.initialize(pattern, True, init_prologue, None, None, None, None, None)
+    out, c1, c2 = alice.write_message(p)
+    print hex(out)
+
 
 j = json.load(open('cacaphony.txt'))
 
