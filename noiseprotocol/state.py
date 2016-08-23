@@ -14,16 +14,16 @@ class CipherState(object):
         self.n = 0
         self.cipher = aead_cipher
 
-    def initialize(self, key):
+    def InitializeKey(self, key):
         if len(key) != 32:
             raise ValueError('Invalid key size (32) for AEAD Cipher.')
         self.k = key
         self.n = 0
 
-    def has_key(self):
+    def HasKey(self):
         return self.k is not None
 
-    def encrypt(self, ad, plaintext):
+    def EncryptWithAd(self, ad, plaintext):
         if self.k is None:
             return plaintext
 
@@ -31,7 +31,7 @@ class CipherState(object):
         self.n += 1
         return ct
 
-    def decrypt(self, ad, ciphertext):
+    def DecryptWithAd(self, ad, ciphertext):
         if self.k is None:
             return ciphertext
 
@@ -51,7 +51,7 @@ class SymmetricState(object):
         self.ck = None
         self.h = None
 
-    def initialize(self, protocol_name):
+    def InitializeSymmetric(self, protocol_name):
         size = self.hash.digest_size
         if len(protocol_name) <= size:
             self.h = protocol_name + '\x00'*(size - len(protocol_name))
@@ -60,26 +60,26 @@ class SymmetricState(object):
 
         self.ck = self.h
 
-    def mix_key(self, input_key_material):
+    def MixKey(self, input_key_material):
         self.ck, temp = self.hash.hkdf(self.ck, input_key_material)
         if len(temp) == 64:
             temp = temp[:32]
-        self.cs.initialize(temp)
+        self.cs.InitializeKey(temp)
 
-    def mix_hash(self, data):
+    def MixHash(self, data):
         self.h = self.hash.hash(self.h + data)
 
-    def encrypt_and_hash(self, plaintext):
-        ct = self.cs.encrypt(self.h, plaintext)
-        self.mix_hash(ct)
+    def EncryptAndHash(self, plaintext):
+        ct = self.cs.EncryptWithAd(self.h, plaintext)
+        self.MixHash(ct)
         return ct
 
-    def decrypt_and_hash(self, ciphertext):
-        pt = self.cs.decrypt(self.h, ciphertext)
-        self.mix_hash(ciphertext)
+    def DecryptAndHash(self, ciphertext):
+        pt = self.cs.DecryptWithAd(self.h, ciphertext)
+        self.MixHash(ciphertext)
         return pt
 
-    def split(self):
+    def Split(self):
         temp_k1, temp_k2 = self.hash.hkdf(self.ck, '')
         if len(temp_k1) == 64:
             temp_k1 = temp_k1[:32]
@@ -87,8 +87,8 @@ class SymmetricState(object):
             temp_k2 = temp_k2[:32]
         c1 = CipherState(self.cs.cipher)
         c2 = CipherState(self.cs.cipher)
-        c1.initialize(temp_k1)
-        c2.initialize(temp_k2)
+        c1.InitializeKey(temp_k1)
+        c2.InitializeKey(temp_k2)
         return (c1, c2)
 
     def __eq__(self, other):
@@ -105,7 +105,7 @@ class HandshakeState(object):
         self.rs = None
         self.re = None
 
-    def initialize(self, handshake_pattern, initiator, prologue='',
+    def Initialize(self, handshake_pattern, initiator, prologue='',
                    s=None, e=None, rs=None, re=None, psk=None):
         prefix = "Noise"
         if psk and len(psk) > 0:
@@ -116,8 +116,8 @@ class HandshakeState(object):
         dh_name = self.dh.name
 
         protocol_name = '_'.join([prefix, handshake_pattern.name, dh_name, cipher_name, hash_name])
-        self.ss.initialize(protocol_name)
-        self.ss.mix_hash(prologue)
+        self.ss.InitializeSymmetric(protocol_name)
+        self.ss.MixHash(prologue)
 
         self.s = s
         self.e = e
@@ -128,27 +128,27 @@ class HandshakeState(object):
 
         for t in handshake_pattern.initiator_premessages:
             if initiator and t == Token.S:
-                self.ss.mix_hash(s.public)
+                self.ss.MixHash(s.public)
             elif initiator and t == Token.E:
-                self.ss.mix_hash(e.public)
+                self.ss.MixHash(e.public)
             elif not initiator and t == Token.S:
-                self.ss.mix_hash(rs)
+                self.ss.MixHash(rs)
             elif not initiator and t == Token.E:
-                self.ss.mix_hash(re)
+                self.ss.MixHash(re)
 
         for t in handshake_pattern.responder_premessages:
             if not initiator and t == Token.S:
-                self.ss.mix_hash(s.public)
+                self.ss.MixHash(s.public)
             elif not initiator and t == Token.E:
-                self.ss.mix_hash(e.public)
+                self.ss.MixHash(e.public)
             elif initiator and t == Token.S:
-                self.ss.mix_hash(rs)
+                self.ss.MixHash(rs)
             elif initiator and t == Token.E:
-                self.ss.mix_hash(re)
+                self.ss.MixHash(re)
 
         self.patterns = list(handshake_pattern.messages)
 
-    def write_message(self, payload):
+    def WriteMessage(self, payload):
         if not self.initiator:
             raise InvalidState("write_message called when not initiator")
 
@@ -159,32 +159,32 @@ class HandshakeState(object):
 
             if p == Token.E:
                 self.e = self.dh.generate_keypair()
-                self.ss.mix_hash(self.e.public)
+                self.ss.MixHash(self.e.public)
                 message_buffer += self.e.public
             elif p == Token.S:
-                message_buffer += self.ss.encrypt_and_hash(self.s.public_key)
+                message_buffer += self.ss.EncryptAndHash(self.s.public_key)
             elif p == Token.DHEE:
-                self.ss.mix_key(self.dh.dh(self.e, self.re))
+                self.ss.MixKey(self.dh.dh(self.e, self.re))
             elif p == Token.DHES:
-                self.ss.mix_key(self.dh.dh(self.e, self.rs))
+                self.ss.MixKey(self.dh.dh(self.e, self.rs))
             elif p == Token.DHSE:
-                self.ss.mix_key(self.dh.dh(self.s, self.re))
+                self.ss.MixKey(self.dh.dh(self.s, self.re))
             elif p == Token.DHSS:
-                self.ss.mix_key(self.dh.dh(self.s, self.rs))
+                self.ss.MixKey(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
                 # we're done
                 break
 
-        message_buffer += self.ss.encrypt_and_hash(payload)
+        message_buffer += self.ss.EncryptAndHash(payload)
 
         c1, c2 = None, None
         if len(self.patterns) == 0:
-            c1, c2 = self.ss.split()
+            c1, c2 = self.ss.Split()
 
         self.initiator = False
         return message_buffer, c1, c2
 
-    def read_message(self, message):
+    def ReadMessage(self, message):
         if self.initiator:
             raise InvalidState("read_message called when initiator")
 
@@ -196,32 +196,32 @@ class HandshakeState(object):
             if p == Token.E:
                 self.re = buf[:self.dh.dhlen]
                 buf = buf[self.dh.dhlen:]
-                self.ss.mix_hash(self.re)
+                self.ss.MixHash(self.re)
             elif p == Token.S:
-                if self.ss.cs.has_key():
+                if self.ss.cs.HasKey():
                     temp = buf[:self.dh.dhlen+16]
                     buf = buf[self.dh.dhlen+16:]
                 else:
                     temp = buf[:self.dh.dhlen]
                     buf = buf[self.dh.dhlen:]
-                self.rs = self.ss.decrypt_and_hash(temp)
+                self.rs = self.ss.DecryptAndHash(temp)
             elif p == Token.DHEE:
-                self.ss.mix_key(self.dh.dh(self.e, self.re))
+                self.ss.MixKey(self.dh.dh(self.e, self.re))
             elif p == Token.DHES:
-                self.ss.mix_key(self.dh.dh(self.e, self.rs))
+                self.ss.MixKey(self.dh.dh(self.e, self.rs))
             elif p == Token.DHSE:
-                self.ss.mix_key(self.dh.dh(self.s, self.re))
+                self.ss.MixKey(self.dh.dh(self.s, self.re))
             elif p == Token.DHSS:
-                self.ss.mix_key(self.dh.dh(self.s, self.rs))
+                self.ss.MixKey(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
                 # we're done
                 break
 
-        payload_buffer = self.ss.decrypt_and_hash(buf)
+        payload_buffer = self.ss.DecryptAndHash(buf)
 
         c1, c2 = None, None
         if len(self.patterns) == 0:
-            c1, c2 = self.ss.split()
+            c1, c2 = self.ss.Split()
 
         self.initiator = True
         return payload_buffer, c1, c2
