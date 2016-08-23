@@ -208,9 +208,9 @@ class HandshakeState(object):
             elif p == Token.DHEE:
                 self.ss.MixKey(self.dh.dh(self.e, self.re))
             elif p == Token.DHES:
-                self.ss.MixKey(self.dh.dh(self.e, self.rs))
-            elif p == Token.DHSE:
                 self.ss.MixKey(self.dh.dh(self.s, self.re))
+            elif p == Token.DHSE:
+                self.ss.MixKey(self.dh.dh(self.e, self.rs))
             elif p == Token.DHSS:
                 self.ss.MixKey(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
