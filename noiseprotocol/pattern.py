@@ -4,9 +4,9 @@ from collections import namedtuple
 
 import enum
 
+
 # taken from:
 # https://github.com/rweather/noise-java/blob/master/NoiseJava/src/com/southernstorm/noise/protocol/Pattern.java  # noqa
-
 class Token(enum.Enum):
 
     S = 1
