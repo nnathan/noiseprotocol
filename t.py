@@ -9,6 +9,7 @@ from noiseprotocol.crypto.dh import *
 from noiseprotocol.pattern import *
 from noiseprotocol.noise import *
 
+
 def mock_curve(name):
     if name == '25519':
         class Curve25519_test(Curve25519):
@@ -43,16 +44,24 @@ def doit(v):
     init_ephemeral = unhex(v.get('init_ephemeral'))
     init_dh.priv = init_ephemeral
     resp_ephemeral = unhex(v.get('resp_ephemeral'))
-    resp_dh.priv = init_ephemeral
-    print "init_dh.priv: {0}".format(hex(init_dh.priv))
-    kp = init_dh().generate_keypair()
-    print "init_dh.genkey.private: {0}".format(hex(kp.private))
-    print "init_dh.genkey.public: {0}".format(hex(kp.public))
+    resp_dh.priv = resp_ephemeral
 
-    e = unhex(v.get('init_ephemeral'))
-    re = unhex(v.get('resp_ephemeral'))
-    alice = NoiseHandshake(aead, hash, init_dh)
-    bob = NoiseHandshake(aead, hash, resp_dh)
+    init, resp = NoiseHandshake(aead, hash, init_dh), NoiseHandshake(aead, hash, resp_dh)
+
+    init.Initialize(pattern, True, init_prologue, None, None, None, None)
+    resp.Initialize(pattern, False, resp_prologue, None, None, None, None)
+
+    for m in v['messages']:
+        print m
+        ct = unhex(m['ciphertext'])
+        payload = unhex(m.get('payload', ''))
+        out1, ic1, ic2 = init.WriteMessage(payload)
+        print "ct:\t{0}".format(hex(ct))
+        print "out1:\t{0}".format(hex(out1))
+        assert out1 == ct
+        out2, rc1, rc2 = resp.ReadMessage(out1)
+        print "out2:\t{0}".format(hex(out2))
+        init, resp = resp, init
 
 j = json.load(open('cacaphony.txt'))
 
