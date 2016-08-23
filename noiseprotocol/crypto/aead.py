@@ -14,8 +14,19 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
 from cryptography.exceptions import InvalidTag as _InvalidTag
 
+
+def nonce(n):
+    '''
+       Cona 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
+       value n encoded as a big-endian value.
+    '''
+
+    return '\x00\x00\x00\x00' + pack('>Q', n)
+
+
 class InvalidTag(Exception):
     pass
+
 
 class AEADCipher(object):
 
@@ -34,22 +45,12 @@ class AESGCM(AEADCipher):
 
     name = 'AESGCM'
 
-    @staticmethod
-    def nonce(n):
-        '''
-           Cona 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
-           value n encoded as a big-endian value.
-        '''
-
-        return '\x00\x00\x00\x00' + pack('>Q', n)
-
     def encrypt(self, n, ad, plaintext):
         '''
            Encrypts and returns concatenation of authentication tag and ciphertext.
         '''
 
-        if len(n) != 12:
-            raise ValueError("Nonce must be 96 bit large")
+        n = nonce(n)
 
         encryptor = Cipher(
             algorithms.AES(self.key),
@@ -67,13 +68,12 @@ class AESGCM(AEADCipher):
            Returns plaintext or raises InvalidTag exception if fail to authenticate.
         '''
 
-        if len(n) != 12:
-            raise ValueError("Nonce must be 96 bit large")
-
         if len(ciphertext) < 16:
             raise ValueError(
                 'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
             )
+
+        n = nonce(n)
 
         decryptor = Cipher(
             algorithms.AES(self.key),
@@ -103,15 +103,6 @@ class ChaChaPoly(AEADCipher):
     name = 'ChaChaPoly'
 
     @staticmethod
-    def nonce(n):
-        '''
-           Construct a 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
-           value n encoded as a little-endian value.
-        '''
-
-        return '\x00\x00\x00\x00' + pack('<Q', n)
-
-    @staticmethod
     def _pad16(data):
         """Return padding for the Associated Authenticated Data"""
         if len(data) % 16 == 0:
@@ -129,8 +120,7 @@ class ChaChaPoly(AEADCipher):
            Encrypts and returns concatenation of authentication tag and ciphertext.
         '''
 
-        if len(n) != 12:
-            raise ValueError("Nonce must be 96 bit large")
+        n = nonce(n)
 
         otk = self._poly1305_gen_key(n)
 
@@ -149,13 +139,12 @@ class ChaChaPoly(AEADCipher):
            Returns plaintext or raises InvalidTag exception if fail to authenticate.
         '''
 
-        if len(n) != 12:
-            raise ValueError("Nonce must be 96 bit long")
-
         if len(ciphertext) < 16:
             raise ValueError(
                 'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
             )
+
+        n = nonce(n)
 
         expected_tag = bytearray(ciphertext[-16:])
         ciphertext = bytearray(ciphertext[:-16])
@@ -301,9 +290,9 @@ class _ChaCha(object):
         for i, block in enumerate(plaintext[i:i+64] for i
                                   in range(0, len(plaintext), 64)):
             key_stream = _ChaCha.chacha_block(self.key,
-                                             self.counter + i,
-                                             self.nonce,
-                                             self.rounds)
+                                              self.counter + i,
+                                              self.nonce,
+                                              self.rounds)
             key_stream = _ChaCha.word_to_bytearray(key_stream)
             encrypted_message += bytearray(x ^ y for x, y
                                            in izip(key_stream, block))
