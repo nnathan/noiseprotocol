@@ -2,6 +2,7 @@
 
 from state import CipherState, SymmetricState, HandshakeState
 
+
 def NoiseHandshake(aead_cipher, hash, dh):
     """ Create a HandshakeState for executing a noise protocol """
 
