@@ -2,8 +2,10 @@
 
 from pattern import Token
 
+
 class InvalidState(Exception):
     pass
+
 
 class CipherState(object):
 
@@ -33,9 +35,13 @@ class CipherState(object):
         if self.k is None:
             return ciphertext
 
+        # raises InvalidTag exception if decrypt fails
         pt = self.cipher(self.k).decrypt(self.n, ad, ciphertext)
         self.n += 1
         return pt
+
+    def __eq__(self, other):
+        return self.k == other.k and self.n == other.n
 
 
 class SymmetricState(object):
@@ -47,19 +53,17 @@ class SymmetricState(object):
 
     def initialize(self, protocol_name):
         size = self.hash.digest_size
-        if len(protocol_name) < size:
+        if len(protocol_name) <= size:
             self.h = protocol_name + '\x00'*(size - len(protocol_name))
         else:
             self.h = self.hash.hash(protocol_name)
 
         self.ck = self.h
-        self.cs.initialize('\x00'*32)
-
 
     def mix_key(self, input_key_material):
         self.ck, temp = self.hash.hkdf(self.ck, input_key_material)
-        if len(temp) > 32:
-            temp = temp[0:32]
+        if len(temp) == 64:
+            temp = temp[:32]
         self.cs.initialize(temp)
 
     def mix_hash(self, data):
@@ -77,15 +81,18 @@ class SymmetricState(object):
 
     def split(self):
         temp_k1, temp_k2 = self.hash.hkdf(self.ck, '')
-        if len(temp_k1) > 32:
-            temp_k1 = temp_k1[0:32]
-        if len(temp_k2) > 32:
-            temp_k2 = temp_k2[0:32]
+        if len(temp_k1) == 64:
+            temp_k1 = temp_k1[:32]
+        if len(temp_k2) == 64:
+            temp_k2 = temp_k2[:32]
         c1 = CipherState(self.cs.cipher)
         c2 = CipherState(self.cs.cipher)
         c1.initialize(temp_k1)
         c2.initialize(temp_k2)
         return (c1, c2)
+
+    def __eq__(self, other):
+        return self.cs == other.cs and self.ck == other.ck and self.h == other.h
 
 
 class HandshakeState(object):
@@ -98,8 +105,9 @@ class HandshakeState(object):
         self.rs = None
         self.re = None
 
-    def initialize(self, handshake_pattern, initiator, prologue, s, e, rs, re, psk=None):
-        prefix = "Noise_"
+    def initialize(self, handshake_pattern, initiator, prologue='',
+                   s=None, e=None, rs=None, re=None, psk=None):
+        prefix = "Noise"
         if psk and len(psk) > 0:
             prefix = "Noise_PSK"
 
@@ -144,15 +152,10 @@ class HandshakeState(object):
         if not self.initiator:
             raise InvalidState("write_message called when not initiator")
 
-        if len(self.patterns) == 0:
-            raise InvalidState("no more message patterns to process")
-
         message_buffer = ""
 
         while len(self.patterns) > 0:
             p = self.patterns.pop(0)
-            print "token: {0}".format(p)
-
 
             if p == Token.E:
                 self.e = self.dh.generate_keypair()
@@ -170,22 +173,20 @@ class HandshakeState(object):
                 self.ss.mix_key(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
                 # we're done
-                self.initiator = False
                 break
 
         message_buffer += self.ss.encrypt_and_hash(payload)
 
-        c1, c2 = self.ss.split()
+        c1, c2 = None, None
+        if len(self.patterns) == 0:
+            c1, c2 = self.ss.split()
 
+        self.initiator = False
         return message_buffer, c1, c2
 
-
     def read_message(self, message):
-        if initiator:
+        if self.initiator:
             raise InvalidState("read_message called when initiator")
-
-        if len(self.patterns) == 0:
-            raise InvalidState("no more message patterns to process")
 
         buf = message
 
@@ -214,11 +215,13 @@ class HandshakeState(object):
                 self.ss.mix_key(self.dh.dh(self.s, self.rs))
             elif p == Token.SWAP:
                 # we're done
-                self.initiator = True
                 break
 
-        payload_buffer = self.decrypt_and_hash(buf)
+        payload_buffer = self.ss.decrypt_and_hash(buf)
 
-        c1, c2 = self.ss.split()
+        c1, c2 = None, None
+        if len(self.patterns) == 0:
+            c1, c2 = self.ss.split()
 
+        self.initiator = True
         return payload_buffer, c1, c2
