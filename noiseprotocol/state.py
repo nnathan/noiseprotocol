@@ -108,8 +108,8 @@ class HandshakeState(object):
     def Initialize(self, handshake_pattern, initiator, prologue='',
                    s=None, e=None, rs=None, re=None, psk=None):
         prefix = "Noise"
-        if psk and len(psk) > 0:
-            prefix = "Noise_PSK"
+        if psk:
+            prefix = "NoisePSK"
 
         cipher_name = self.ss.cs.cipher.name
         hash_name = self.ss.hash.name
@@ -118,6 +118,10 @@ class HandshakeState(object):
         protocol_name = '_'.join([prefix, handshake_pattern.name, dh_name, cipher_name, hash_name])
         self.ss.InitializeSymmetric(protocol_name)
         self.ss.MixHash(prologue)
+
+        if psk:
+            self.ss.ck, temp = self.ss.hash.hkdf(self.ss.ck, psk)
+            self.ss.MixHash(temp)
 
         self.s = s
         self.e = e
@@ -131,26 +135,37 @@ class HandshakeState(object):
                 self.ss.MixHash(s.public)
             elif initiator and t == Token.E:
                 self.ss.MixHash(e.public)
+                if psk:
+                    self.ss.MixKey(e.public)
             elif not initiator and t == Token.S:
                 self.ss.MixHash(rs)
             elif not initiator and t == Token.E:
                 self.ss.MixHash(re)
+                if psk:
+                    self.ss.MixKey(e.public)
 
         for t in handshake_pattern.responder_premessages:
             if not initiator and t == Token.S:
                 self.ss.MixHash(s.public)
             elif not initiator and t == Token.E:
                 self.ss.MixHash(e.public)
+                if psk:
+                    self.ss.MixKey(e.public)
             elif initiator and t == Token.S:
                 self.ss.MixHash(rs)
             elif initiator and t == Token.E:
                 self.ss.MixHash(re)
+                if psk:
+                    self.ss.MixKey(e.public)
 
         self.patterns = list(handshake_pattern.messages)
+
 
     def WriteMessage(self, payload):
         if not self.initiator:
             raise InvalidState("write_message called when not initiator")
+        if self.patterns == []:
+            raise InvalidState("no more message patterns to process")
 
         message_buffer = ""
 
@@ -161,8 +176,10 @@ class HandshakeState(object):
                 self.e = self.dh.generate_keypair()
                 self.ss.MixHash(self.e.public)
                 message_buffer += self.e.public
+                if self.psk is not None:
+                    self.ss.MixKey(self.e.public)
             elif p == Token.S:
-                message_buffer += self.ss.EncryptAndHash(self.s.public_key)
+                message_buffer += self.ss.EncryptAndHash(self.s.public)
             elif p == Token.DHEE:
                 self.ss.MixKey(self.dh.dh(self.e, self.re))
             elif p == Token.DHES:
@@ -187,6 +204,8 @@ class HandshakeState(object):
     def ReadMessage(self, message):
         if self.initiator:
             raise InvalidState("read_message called when initiator")
+        if self.patterns == []:
+            raise InvalidState("no more message patterns to process")
 
         buf = message
 
@@ -197,6 +216,8 @@ class HandshakeState(object):
                 self.re = buf[:self.dh.dhlen]
                 buf = buf[self.dh.dhlen:]
                 self.ss.MixHash(self.re)
+                if self.psk is not None:
+                    self.ss.MixKey(self.re)
             elif p == Token.S:
                 if self.ss.cs.HasKey():
                     temp = buf[:self.dh.dhlen+16]
