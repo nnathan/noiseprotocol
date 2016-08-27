@@ -15,15 +15,6 @@ from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
 from cryptography.exceptions import InvalidTag as _InvalidTag
 
 
-def nonce(n):
-    '''
-       Cona 96-byte nonce where leading 32-bits are 0 and the trailing 64-bits is the
-       value n encoded as a big-endian value.
-    '''
-
-    return '\x00\x00\x00\x00' + pack('>Q', n)
-
-
 class InvalidTag(Exception):
     pass
 
@@ -50,7 +41,7 @@ class AESGCM(AEADCipher):
            Encrypts and returns concatenation of authentication tag and ciphertext.
         '''
 
-        n = nonce(n)
+        n = self._nonce(n)
 
         encryptor = Cipher(
             algorithms.AES(self.key),
@@ -73,7 +64,7 @@ class AESGCM(AEADCipher):
                 'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
             )
 
-        n = nonce(n)
+        n = self._nonce(n)
 
         decryptor = Cipher(
             algorithms.AES(self.key),
@@ -90,6 +81,14 @@ class AESGCM(AEADCipher):
             raise
 
         return plaintext
+
+    def _nonce(self, n):
+        '''
+           96-bit nonce where leading 32-bits are 0 and the trailing 64-bits is the
+           value n encoded as a big-endian value.
+        '''
+
+        return '\x00\x00\x00\x00' + pack('>Q', n)
 
 
 class ChaChaPoly(AEADCipher):
@@ -120,7 +119,7 @@ class ChaChaPoly(AEADCipher):
            Encrypts and returns concatenation of authentication tag and ciphertext.
         '''
 
-        n = nonce(n)
+        n = self._nonce(n)
 
         otk = self._poly1305_gen_key(n)
 
@@ -144,7 +143,7 @@ class ChaChaPoly(AEADCipher):
                 'Invalid ciphertext length (len={0}), must be >16 bytes.'.format(len(ciphertext))
             )
 
-        n = nonce(n)
+        n = self._nonce(n)
 
         expected_tag = bytearray(ciphertext[-16:])
         ciphertext = bytearray(ciphertext[:-16])
@@ -161,6 +160,14 @@ class ChaChaPoly(AEADCipher):
             raise InvalidTag
 
         return str(_ChaCha(self.key, n, counter=1).decrypt(ciphertext))
+
+    def _nonce(self, n):
+        '''
+           96-bit nonce where leading 32-bits are 0 and the trailing 64-bits is the
+           value n encoded as a little-endian value.
+        '''
+
+        return '\x00\x00\x00\x00' + pack('<Q', n)
 
 
 class _ChaCha(object):
