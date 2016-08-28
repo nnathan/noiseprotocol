@@ -17,13 +17,11 @@ class Curve25519(object):
     name = '25519'
     dhlen = 32
 
-    dhlen = 32
-
-    def __init__(self):
-        pass
+    def __init__(self, rng=os.urandom):
+        self.rng = rng
 
     def generate_keypair(self):
-        priv = os.urandom(32)
+        priv = self.rng(32)
         pub = c25519_scalarmult_base(priv)
         return DHKeyPair(priv, pub)
 
@@ -36,13 +34,11 @@ class Curve448(object):
     name = '448'
     dhlen = 56
 
-    dhlen = 56
-
-    def __init__(self):
-        pass
+    def __init__(self, rng=os.urandom):
+        self.rng = rng
 
     def generate_keypair(self):
-        priv = os.urandom(56)
+        priv = self.rng(56)
         pub = c448_scalarmult_base(priv)
         return DHKeyPair(priv, pub)
 

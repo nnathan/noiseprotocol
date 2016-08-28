@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from pattern import Token
+import os
 
 
 class InvalidState(Exception):
@@ -96,9 +97,9 @@ class SymmetricState(object):
 
 
 class HandshakeState(object):
-    def __init__(self, symmetric_state, dh):
+    def __init__(self, symmetric_state, dh, rng=os.urandom):
         self.ss = symmetric_state
-        self.dh = dh()
+        self.dh = dh(rng)
         self.pattern = None
         self.s = None
         self.e = None

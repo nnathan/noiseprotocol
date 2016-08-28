@@ -15,31 +15,14 @@ def unhex(s):
     else:
         return unhexlify(s)
 
-def mock_curve(name):
-    if name == '25519':
-        class Curve25519_test(Curve25519):
-            def generate_keypair(self):
-                pub = c25519_scalarmult_base(self.priv)
-                return DHKeyPair(self.priv, pub)
-
-        return Curve25519_test
-    elif name == '448':
-        class Curve448_test(Curve448):
-            def generate_keypair(self):
-                pub = c448_scalarmult_base(self.priv)
-                return DHKeyPair(self.priv, pub)
-
-        return Curve448_test
-
-
 def doit(v):
     print v['name']
     if 'SSK' in v['name']:
         return
     name = v['name']
     aead = globals()[v['cipher']]
-    init_dh = mock_curve(v['dh'])
-    resp_dh = mock_curve(v['dh'])
+    init_dh = globals()['Curve'+v['dh']]
+    resp_dh = globals()['Curve'+v['dh']]
     hash = globals()[v['hash']]
     pattern = globals()['Noise_'+v['pattern']]
     one_way = False
@@ -50,15 +33,11 @@ def doit(v):
     if v.get('init_psk', None) is not None:
         prefix += 'PSK'
     assert name == '_'.join([prefix, pattern.name, init_dh.name, aead.name, hash.name])
+
     init_prologue = unhex(v.get('init_prologue'))
     resp_prologue = unhex(v.get('resp_prologue'))
-    # sanity check
-    assert init_prologue == resp_prologue
-
     init_ephemeral = unhex(v.get('init_ephemeral'))
-    init_dh.priv = init_ephemeral
     resp_ephemeral = unhex(v.get('resp_ephemeral'))
-    resp_dh.priv = resp_ephemeral
 
     init_psk = unhex(v.get('init_psk', None))
     resp_psk = unhex(v.get('resp_psk', None))
@@ -66,11 +45,10 @@ def doit(v):
     init_static = unhex(v.get('init_static', None))
     resp_static = unhex(v.get('resp_static', None))
     if init_static is not None:
-        dh = init_dh()
-        dh.priv = init_static
+        dh = init_dh(lambda x: init_static)
         init_static = dh.generate_keypair()
     if resp_static is not None:
-        dh = resp_dh()
+        dh = resp_dh(lambda x: resp_static)
         dh.priv = resp_static
         resp_static = dh.generate_keypair()
     init_semiephemeral = unhex(v.get('init_semiephemeral', None))
@@ -80,7 +58,8 @@ def doit(v):
     init_remote_semiephemeral = unhex(v.get('init_remote_semiephemeral', None))
     resp_remote_semiephemeral = unhex(v.get('resp_remote_semiephemeral', None))
 
-    init, resp = NoiseHandshake(aead, hash, init_dh), NoiseHandshake(aead, hash, resp_dh)
+    init = NoiseHandshake(aead, hash, init_dh, lambda x: init_ephemeral)
+    resp = NoiseHandshake(aead, hash, resp_dh, lambda y: resp_ephemeral)
 
     init.Initialize(pattern, True, init_prologue, init_static, init_semiephemeral, init_remote_static, init_remote_semiephemeral, init_psk)
     resp.Initialize(pattern, False, resp_prologue, resp_static, resp_semiephemeral, resp_remote_static, resp_remote_semiephemeral, resp_psk)
