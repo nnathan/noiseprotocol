@@ -80,8 +80,8 @@ class SymmetricState(object):
         self.MixHash(ciphertext)
         return pt
 
-    def Split(self):
-        temp_k1, temp_k2 = self.hash.hkdf(self.ck, '')
+    def Split(self, ssk=''):
+        temp_k1, temp_k2 = self.hash.hkdf(self.ck, ssk)
         if len(temp_k1) == 64:
             temp_k1 = temp_k1[:32]
         if len(temp_k2) == 64:

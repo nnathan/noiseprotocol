@@ -16,9 +16,6 @@ def unhex(s):
         return unhexlify(s)
 
 def doit(v):
-    print v['name']
-    if 'SSK' in v['name']:
-        return
     name = v['name']
     aead = globals()[v['cipher']]
     init_dh = globals()['Curve'+v['dh']]
@@ -32,6 +29,12 @@ def doit(v):
     prefix = 'Noise'
     if v.get('init_psk', None) is not None:
         prefix += 'PSK'
+
+    init_ssk = unhex(v.get('init_ssk', ''))
+    resp_ssk = unhex(v.get('resp_ssk', ''))
+
+    if init_ssk != '':
+        prefix += '_SSK'
     assert name == '_'.join([prefix, pattern.name, init_dh.name, aead.name, hash.name])
 
     init_prologue = unhex(v.get('init_prologue'))
@@ -81,6 +84,10 @@ def doit(v):
         send, recv = recv, send
         if ic1 is not None and ic2 is not None and rc1 is not None and rc2 is not None:
             break
+
+    # redo split with SSK
+    ic1, ic2 = send.ss.Split(init_ssk)
+    rc1, rc2 = send.ss.Split(resp_ssk)
 
     if resp.initiator and not one_way:
         ic2, ic1, rc2, rc1 = rc1, rc2, ic1, ic2
