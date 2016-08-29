@@ -36,7 +36,7 @@ class CipherState(object):
         if self.k is None:
             return ciphertext
 
-        # raises InvalidTag exception if decrypt fails
+        # raises MessageAuthenticationFailure exception if decrypt fails
         pt = self.cipher(self.k).decrypt(self.n, ad, ciphertext)
         self.n += 1
         return pt
@@ -160,7 +160,6 @@ class HandshakeState(object):
                     self.ss.MixKey(e.public)
 
         self.patterns = list(handshake_pattern.messages)
-
 
     def WriteMessage(self, payload):
         if not self.initiator:

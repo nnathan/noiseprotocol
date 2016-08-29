@@ -10,12 +10,15 @@ from struct import pack, unpack
 
 from itertools import izip
 
+# constant-time compare
+from hmac import compare_digest
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
 from cryptography.exceptions import InvalidTag as _InvalidTag
 
 
-class InvalidTag(Exception):
+class MessageAuthenticationFailure(Exception):
     pass
 
 
@@ -56,7 +59,8 @@ class AESGCM(AEADCipher):
 
     def decrypt(self, n, ad, ciphertext):
         '''
-           Returns plaintext or raises InvalidTag exception if fail to authenticate.
+           Returns plaintext or raises MessageAuthenticationFailure exception
+           if fail to authenticate.
         '''
 
         if len(ciphertext) < 16:
@@ -76,7 +80,7 @@ class AESGCM(AEADCipher):
         try:
             plaintext = decryptor.update(ciphertext[:-16]) + decryptor.finalize()
         except _InvalidTag:
-            raise InvalidTag
+            raise MessageAuthenticationFailure
         except:
             raise
 
@@ -156,8 +160,8 @@ class ChaChaPoly(AEADCipher):
         mac_data += pack('<Q', len(ciphertext))
         tag = _Poly1305(otk).create_tag(mac_data)
 
-        if tag != expected_tag:
-            raise InvalidTag
+        if not compare_digest(tag, expected_tag):
+            raise MessageAuthenticationFailure
 
         return str(_ChaCha(self.key, n, counter=1).decrypt(ciphertext))
 
